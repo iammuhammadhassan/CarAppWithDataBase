@@ -15,7 +15,6 @@ class Car {
     required this.location,
   });
 
-  // This converts the JSON from your PHP script into a Flutter Car object
   factory Car.fromJson(Map<String, dynamic> json) {
     return Car(
       id: json['vehicle_id'].toString(),
