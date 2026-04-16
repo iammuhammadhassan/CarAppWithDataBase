@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'screens/showroom_screen.dart'; // Import your new screen
+import 'package:google_fonts/google_fonts.dart';
+import 'screens/showroom_screen.dart';
+
+final Color primaryNeon = const Color(0xFF00F5FF);
+final Color midnightBg = const Color(0xFF0B0D0F); 
 
 void main() {
   runApp(const MyApp());
@@ -12,9 +16,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Vortex Motors',
-      theme: ThemeData.dark(),
-      home: const ShowroomScreen(), // Set the showroom as the starting page
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: midnightBg,
+        primaryColor: primaryNeon,
+        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
+      ),
+      home: const ShowroomScreen(),
     );
   }
 }
