@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/seller_dashboard.dart';
+import 'package:mycar/screens/login_screen.dart';
+
 
 final Color primaryNeon = const Color(0xFF00F5FF);
 final Color midnightBg = const Color(0xFF0B0D0F);
@@ -21,7 +22,7 @@ class MyApp extends StatelessWidget {
         primaryColor: primaryNeon,
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       ),
-      home: const SellerDashboard(),
+      home: const LoginScreen(),
     );
   }
 }

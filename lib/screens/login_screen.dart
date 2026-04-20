@@ -1,11 +1,11 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/user_model.dart';
-import '../services/api_service.dart';
-import 'admin_dashboard.dart';
-import 'inspector_screen.dart';
-import 'seller_dashboard.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'showroom_screen.dart';
+import 'seller_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,135 +14,290 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
+// We need SingleTickerProviderStateMixin for the animation controller
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  // Theme & Controllers
+  final Color primaryNeon = const Color(0xFF00F5FF);
+  final Color midnightBg = const Color(0xFF0B0D0F);
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _pass = TextEditingController();
+
+  // Animation Variables
+  late AnimationController _rotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the controller to spin every 10 seconds, infinitely
+    _rotationController = AnimationController(
+      duration: const Duration(seconds: 10),
+      vsync: this,
+    )..repeat(); // Starts spinning immediately and repeats
+  }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _rotationController.dispose(); // Always dispose controllers!
     super.dispose();
   }
 
-  Future<void> _login() async {
-    FocusScope.of(context).unfocus();
-    setState(() => _isLoading = true);
+  void _loginUser() async {
+    // 1. Email Format Check (Regex)
+    bool emailValid = RegExp(
+      r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
+    ).hasMatch(_email.text);
 
-    final user = await ApiService().login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid credentials or server error.')),
-      );
+    // 2. Validate Inputs
+    if (_email.text.isEmpty || _pass.text.isEmpty) {
+      _showSnackBar("All fields are required!");
+      return;
+    } else if (!emailValid) {
+      _showSnackBar("Please enter a valid email address.");
       return;
     }
 
-    handleLogin(user);
+    // 3. Proceed to API
+    try {
+      final response = await http.post(
+        Uri.parse("http://192.168.1.9/car_api/login.php"),
+        body: {"email": _email.text, "password": _pass.text},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success']) {
+          // Navigation Logic...
+          String role = data['role'];
+          if (role == 'buyer') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ShowroomScreen()),
+            );
+          } else if (role == 'seller') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const SellerDashboard()),
+            );
+          }
+        } else {
+          // 4. Handle wrong password/email from Backend
+          _showSnackBar(
+            data['message'],
+          ); // Displays "Invalid email or password"
+        }
+      }
+    } catch (e) {
+      _showSnackBar("Server connection error. Check XAMPP.");
+    }
   }
 
-  void handleLogin(UserModel user) {
-    if (user.role == 'buyer') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              ShowroomScreen(userRole: user.role, fullName: user.fullName),
-        ),
-      );
-    } else if (user.role == 'seller') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const SellerDashboard()),
-      );
-    } else if (user.role == 'inspector') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const InspectorScreen()),
-      );
-    } else if (user.role == 'admin') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AdminDashboard()),
-      );
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Unknown role: ${user.role}')));
-    }
+  // Helper for UI Feedback
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0B0D0F), Color(0xFF151A1F)],
-          ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'VORTEX LOGIN',
-                    style: GoogleFonts.outfit(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Login'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      backgroundColor: midnightBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 50),
+              // 1. The Animated Logo (Fix 1: Not static)
+              _buildAnimatedLogo(),
+              const SizedBox(height: 30),
+              _buildBrandingText(),
+              const SizedBox(height: 40),
+              // 2. Glowing Input Fields
+              _buildInput(_email, Icons.email_outlined, "Email Address", false),
+              const SizedBox(height: 15),
+              _buildInput(_pass, Icons.lock_outlined, "Password", true),
+              const SizedBox(height: 10),
+              _buildForgotPassword(),
+              const SizedBox(height: 40),
+              // 3. High-Energy Button
+              _buildStartEngineButton(),
+              const SizedBox(height: 25),
+              _buildNewDriverOption(),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  // The Infinite Rotation Logo implementation
+  Widget _buildAnimatedLogo() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Outer Static Ring (Glass)
+        Container(
+          width: 130,
+          height: 130,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withOpacity(0.02),
+            border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+          ),
+        ),
+        // INNER SPINNING ELEMENT (Fix 1: The speed meter is not static)
+        RotationTransition(
+          turns: _rotationController, // Tells the controller to spin
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: primaryNeon.withOpacity(0.3),
+                  blurRadius: 40,
+                  spreadRadius: 5,
+                ),
+              ],
+              border: Border.all(color: primaryNeon.withOpacity(0.5), width: 3),
+            ),
+            // Replacing the speedmeter icon for better visual spin indication
+            child: Icon(
+              Icons.incomplete_circle_rounded,
+              color: primaryNeon,
+              size: 45,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInput(
+    TextEditingController controller,
+    IconData icon,
+    String hint,
+    bool isObscure,
+  ) {
+    return TextField(
+      controller: controller,
+      obscureText: isObscure,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        prefixIcon: Icon(icon, color: primaryNeon, size: 18),
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white30, fontSize: 14),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        contentPadding: const EdgeInsets.all(22),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Colors.white10),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: primaryNeon),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStartEngineButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 65,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+              color: primaryNeon.withOpacity(0.3),
+              blurRadius: 15,
+              spreadRadius: 3,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryNeon,
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(25),
+            ),
+          ),
+          onPressed: _loginUser,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "START ENGINE",
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(Icons.arrow_forward_rounded, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // The rest of your Figma text elements...
+  Widget _buildBrandingText() {
+    return Column(
+      children: [
+        Text(
+          "VORTEX MOTORS",
+          style: GoogleFonts.outfit(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 2,
+          ),
+        ),
+        Text(
+          "Ignite Your Journey",
+          style: GoogleFonts.outfit(color: Colors.white54, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForgotPassword() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: () {},
+        child: Text(
+          "Forgot Password?",
+          style: TextStyle(color: primaryNeon, fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewDriverOption() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text("New driver? ", style: TextStyle(color: Colors.white30)),
+        Text(
+          "Get Licensed →",
+          style: TextStyle(color: primaryNeon, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }
