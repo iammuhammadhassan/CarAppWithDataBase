@@ -25,6 +25,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   // Animation Variables
   late AnimationController _rotationController;
+  bool _isLoggingIn = false;
 
   @override
   void initState() {
@@ -39,17 +40,34 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _rotationController.dispose(); // Always dispose controllers!
+    _email.dispose();
+    _pass.dispose();
     super.dispose();
   }
 
+  bool _isLoginSuccess(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value == 1;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'success';
+    }
+    return false;
+  }
+
   void _loginUser() async {
+    final email = _email.text.trim().toLowerCase();
+    final password = _pass.text.trim();
+
     // 1. Email Format Check (Regex)
     bool emailValid = RegExp(
       r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
-    ).hasMatch(_email.text);
+    ).hasMatch(email);
 
     // 2. Validate Inputs
-    if (_email.text.isEmpty || _pass.text.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       _showSnackBar("All fields are required!");
       return;
     } else if (!emailValid) {
@@ -57,18 +75,21 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    if (_isLoggingIn) return;
+    setState(() => _isLoggingIn = true);
+
     // 3. Proceed to API
     try {
       final response = await http.post(
         Uri.parse("http://192.168.1.9/car_api/login.php"),
-        body: {"email": _email.text, "password": _pass.text},
+        body: {"email": email, "password": password},
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success']) {
+        if (_isLoginSuccess(data['success'])) {
           // Navigation Logic...
-          String role = data['role'];
+          final role = (data['role'] ?? '').toString().trim().toLowerCase();
           if (role == 'buyer') {
             Navigator.pushReplacement(
               context,
@@ -79,16 +100,29 @@ class _LoginScreenState extends State<LoginScreen>
               context,
               MaterialPageRoute(builder: (context) => const SellerDashboard()),
             );
+          } else {
+            _showSnackBar("Login succeeded but role is missing or invalid.");
           }
         } else {
           // 4. Handle wrong password/email from Backend
+          final message = (data['message'] ?? 'Invalid email or password.')
+              .toString()
+              .trim();
           _showSnackBar(
-            data['message'],
-          ); // Displays "Invalid email or password"
+            message.isEmpty ? 'Invalid email or password.' : message,
+          );
         }
+      } else {
+        _showSnackBar(
+          "Login failed (${response.statusCode}). Please try again.",
+        );
       }
     } catch (e) {
       _showSnackBar("Server connection error. Check XAMPP.");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoggingIn = false);
+      }
     }
   }
 
@@ -233,22 +267,31 @@ class _LoginScreenState extends State<LoginScreen>
               borderRadius: BorderRadius.circular(25),
             ),
           ),
-          onPressed: _loginUser,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                "START ENGINE",
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
+          onPressed: _isLoggingIn ? null : _loginUser,
+          child: _isLoggingIn
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                  ),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "START ENGINE",
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.arrow_forward_rounded, size: 20),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              const Icon(Icons.arrow_forward_rounded, size: 20),
-            ],
-          ),
         ),
       ),
     );

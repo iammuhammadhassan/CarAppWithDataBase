@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'login_screen.dart';
+import '../services/api_service.dart';
 
 class SellerDashboard extends StatefulWidget {
   const SellerDashboard({super.key});
@@ -15,10 +16,14 @@ class SellerDashboard extends StatefulWidget {
 class _SellerDashboardState extends State<SellerDashboard>
     with TickerProviderStateMixin {
   late final AnimationController _logoGlowController;
+  late final Future<Map<String, dynamic>> _sellerStatsFuture;
+  late final Future<List<double>> _weeklyViewsFuture;
 
   @override
   void initState() {
     super.initState();
+    _sellerStatsFuture = ApiService().fetchSellerStats();
+    _weeklyViewsFuture = ApiService().fetchWeeklyViews();
     _logoGlowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -33,6 +38,24 @@ class _SellerDashboardState extends State<SellerDashboard>
 
   final Color primaryNeon = const Color(0xFF00F5FF);
   final Color obsidianBg = const Color(0xFF0B0D0F);
+
+  String _formatCompactStat(dynamic value) {
+    final raw = (value ?? '0').toString().trim().replaceAll(',', '');
+    final number = double.tryParse(raw);
+    if (number == null) return '0';
+
+    if (number >= 1000000000) {
+      return '${(number / 1000000000).toStringAsFixed(1)}B';
+    }
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    }
+    if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+
+    return number.toStringAsFixed(0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,14 +225,39 @@ class _SellerDashboardState extends State<SellerDashboard>
 
   // 2. The Stats Grid (Using flex to ensure equal size)
   Widget _buildStatsGrid() {
-    return Row(
-      children: [
-        _buildStatCard("2", "Active", Icons.directions_car),
-        const SizedBox(width: 10),
-        _buildStatCard("4.3K", "Views", Icons.remove_red_eye_outlined),
-        const SizedBox(width: 10),
-        _buildStatCard("75", "Inquiries", Icons.chat_bubble_outline),
-      ],
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _sellerStatsFuture,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final data = snapshot.data ?? <String, dynamic>{};
+        final stats =
+            (data['stats'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+
+        return Row(
+          children: [
+            _buildStatCard(
+              _formatCompactStat(stats['active_listings']),
+              "Active\nListings",
+              Icons.directions_car,
+            ),
+            const SizedBox(width: 10),
+            _buildStatCard(
+              _formatCompactStat(stats['total_views']),
+              "Total\nViews",
+              Icons.remove_red_eye_outlined,
+            ),
+            const SizedBox(width: 10),
+            _buildStatCard(
+              _formatCompactStat(stats['total_inquiries']),
+              "Inquiries",
+              Icons.chat_bubble_outline,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -276,33 +324,41 @@ class _SellerDashboardState extends State<SellerDashboard>
               ),
             ],
           ),
-          child: LineChart(
-            LineChartData(
-              gridData: FlGridData(show: false),
-              titlesData: FlTitlesData(show: false),
-              borderData: FlBorderData(show: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: const [
-                    FlSpot(0, 200),
-                    FlSpot(1, 300),
-                    FlSpot(2, 280),
-                    FlSpot(3, 450),
-                    FlSpot(4, 520),
-                    FlSpot(5, 680),
-                    FlSpot(6, 540),
+          child: FutureBuilder<List<double>>(
+            future: _weeklyViewsFuture,
+            builder: (context, snapshot) {
+              final values =
+                  (snapshot.data != null && snapshot.data!.isNotEmpty)
+                  ? snapshot.data!
+                  : <double>[0, 0, 0, 0, 0, 0, 0];
+
+              final spots = values
+                  .asMap()
+                  .entries
+                  .map((entry) => FlSpot(entry.key.toDouble(), entry.value))
+                  .toList();
+
+              return LineChart(
+                LineChartData(
+                  gridData: FlGridData(show: false),
+                  titlesData: FlTitlesData(show: false),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: primaryNeon,
+                      barWidth: 4,
+                      dotData: FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: primaryNeon.withOpacity(0.1),
+                      ),
+                    ),
                   ],
-                  isCurved: true,
-                  color: primaryNeon,
-                  barWidth: 4,
-                  dotData: FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    color: primaryNeon.withOpacity(0.1),
-                  ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ],
@@ -311,20 +367,54 @@ class _SellerDashboardState extends State<SellerDashboard>
 
   // 4. The Listings List (Using Network Images)
   Widget _buildActiveListingsList() {
-    return Column(
-      children: [
-        _buildListCard(
-          "https://images.unsplash.com/photo-1503376780353-7e11c2706b74",
-          "Porsche 911",
-          "PKR 85.5M",
-        ),
-        const SizedBox(height: 12),
-        _buildListCard(
-          "https://images.unsplash.com/photo-1555215695-3004980ad54e",
-          "BMW M4",
-          "PKR 28.5M",
-        ),
-      ],
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _sellerStatsFuture,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final data = snapshot.data ?? <String, dynamic>{};
+        final listings = (data['listings'] as List?) ?? <dynamic>[];
+
+        if (listings.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: const Text(
+              'No active listings found for this seller.',
+              style: TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+
+        return Column(
+          children: List.generate(listings.length, (index) {
+            final item =
+                listings[index] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+            final make = (item['make'] ?? '').toString().trim();
+            final model = (item['model'] ?? '').toString().trim();
+            final title = '$make $model'.trim().isEmpty
+                ? 'Untitled Car'
+                : '$make $model'.trim();
+            final price = 'PKR ${(item['price'] ?? '0').toString()}';
+            final imageUrl = (item['image_url'] ?? '').toString().trim();
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == listings.length - 1 ? 0 : 12,
+              ),
+              child: _buildListCard(imageUrl, title, price),
+            );
+          }),
+        );
+      },
     );
   }
 
@@ -348,12 +438,35 @@ class _SellerDashboardState extends State<SellerDashboard>
           ClipRRect(
             // Image Implementation
             borderRadius: BorderRadius.circular(15),
-            child: Image.network(
-              imageUrl,
-              width: 60,
-              height: 60,
-              fit: BoxFit.cover,
-            ),
+            child: imageUrl.isEmpty
+                ? Container(
+                    width: 60,
+                    height: 60,
+                    color: Colors.white12,
+                    child: Icon(
+                      Icons.directions_car,
+                      color: primaryNeon,
+                      size: 28,
+                    ),
+                  )
+                : Image.network(
+                    imageUrl,
+                    width: 60,
+                    height: 60,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 60,
+                        height: 60,
+                        color: Colors.white12,
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: primaryNeon,
+                          size: 28,
+                        ),
+                      );
+                    },
+                  ),
           ),
           const SizedBox(width: 15),
           Column(
