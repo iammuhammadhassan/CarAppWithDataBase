@@ -387,7 +387,7 @@ class _SellerDashboardState extends State<SellerDashboard>
               border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
             child: const Text(
-              'No active listings found for this seller.',
+            'No active listings found for this seller.',
               style: TextStyle(color: Colors.white70),
             ),
           );
