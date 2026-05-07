@@ -2,8 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import '../services/api_service.dart';
 import 'showroom_screen.dart';
 import 'seller_dashboard.dart';
 
@@ -22,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen>
   final Color midnightBg = const Color(0xFF0B0D0F);
   final TextEditingController _email = TextEditingController();
   final TextEditingController _pass = TextEditingController();
+  final ApiService _apiService = ApiService();
 
   // Animation Variables
   late AnimationController _rotationController;
@@ -43,18 +43,6 @@ class _LoginScreenState extends State<LoginScreen>
     _email.dispose();
     _pass.dispose();
     super.dispose();
-  }
-
-  bool _isLoginSuccess(dynamic value) {
-    if (value is bool) return value;
-    if (value is num) return value == 1;
-    if (value is String) {
-      final normalized = value.trim().toLowerCase();
-      return normalized == 'true' ||
-          normalized == '1' ||
-          normalized == 'success';
-    }
-    return false;
   }
 
   void _loginUser() async {
@@ -80,44 +68,38 @@ class _LoginScreenState extends State<LoginScreen>
 
     // 3. Proceed to API
     try {
-      final response = await http.post(
-        Uri.parse("http://192.168.1.9/car_api/login.php"),
-        body: {"email": email, "password": password},
-      );
+      final user = await _apiService.login(email, password);
+      // ignore: avoid_print
+      print('DEBUG: Login returned user: $user');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (_isLoginSuccess(data['success'])) {
-          // Navigation Logic...
-          final role = (data['role'] ?? '').toString().trim().toLowerCase();
-          if (role == 'buyer') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const ShowroomScreen()),
-            );
-          } else if (role == 'seller') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const SellerDashboard()),
-            );
-          } else {
-            _showSnackBar("Login succeeded but role is missing or invalid.");
-          }
-        } else {
-          // 4. Handle wrong password/email from Backend
-          final message = (data['message'] ?? 'Invalid email or password.')
-              .toString()
-              .trim();
-          _showSnackBar(
-            message.isEmpty ? 'Invalid email or password.' : message,
+      if (user != null) {
+        final role = user.role.trim().toLowerCase();
+        // ignore: avoid_print
+        print('DEBUG: User role: $role, userId: ${user.userId}');
+
+        if (role == 'buyer') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const ShowroomScreen()),
           );
+        } else if (role == 'seller') {
+          // ignore: avoid_print
+          print('DEBUG: Navigating seller with ID: ${user.userId}');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SellerDashboard(sellerId: user.userId ?? 1),
+            ),
+          );
+        } else {
+          _showSnackBar("Login succeeded but role is missing or invalid.");
         }
       } else {
-        _showSnackBar(
-          "Login failed (${response.statusCode}). Please try again.",
-        );
+        _showSnackBar("Invalid email or password.");
       }
     } catch (e) {
+      // ignore: avoid_print
+      print('DEBUG: Login exception: $e');
       _showSnackBar("Server connection error. Check XAMPP.");
     } finally {
       if (mounted) {

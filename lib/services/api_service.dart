@@ -4,10 +4,23 @@ import '../models/car_model.dart';
 import '../models/user_model.dart';
 
 class ApiService {
-  final String baseUrl = "http://192.168.1.9/car_api/fetch_cars.php";
-  final String loginUrl = "http://192.168.1.9/car_api/login.php";
-  final String sellerStatsUrl =
-      "http://192.168.1.9/car_api/get_seller_stats.php";
+  static const String _apiHost = "http://192.168.1.8/car_api";
+  final String baseUrl = "$_apiHost/fetch_cars.php";
+  final String loginUrl = "$_apiHost/login.php";
+  final String sellerStatsUrl = "$_apiHost/get_seller_stats.php";
+
+  bool _isLoginSuccess(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value == 1;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' ||
+          normalized == '1' ||
+          normalized == 'success';
+    }
+
+    return false;
+  }
 
   Future<List<Car>> getCars() async {
     try {
@@ -31,16 +44,23 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse(loginUrl),
-        body: {'email': email, 'password': password},
+        body: {
+          'email': email.trim().toLowerCase(),
+          'password': password.trim(),
+        },
       );
 
       if (response.statusCode != 200) {
         return null;
       }
 
-      final Map<String, dynamic> body = jsonDecode(response.body);
-      if (body['success'] == true) {
-        return UserModel.fromJson(body);
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+
+      if (_isLoginSuccess(decoded['success'])) {
+        return UserModel.fromJson(decoded);
       }
 
       return null;
@@ -53,7 +73,7 @@ class ApiService {
 
   Future<List<double>> fetchWeeklyViews() async {
     final response = await http.get(
-      Uri.parse("http://192.168.1.9/car_api/get_weekly_views.php"),
+      Uri.parse("http://192.168.1.8/car_api/get_weekly_views.php"),
     );
 
     if (response.statusCode == 200) {
@@ -65,15 +85,26 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> fetchSellerStats() async {
+  Future<Map<String, dynamic>> fetchSellerStats(int sellerId) async {
     try {
-      final response = await http.get(Uri.parse(sellerStatsUrl));
+      // ignore: avoid_print
+      print('DEBUG: Sending Seller ID to Server: $sellerId');
+
+      final response = await http.post(
+        Uri.parse(sellerStatsUrl),
+        body: {'seller_id': sellerId.toString()},
+      );
 
       if (response.statusCode != 200) {
+        // ignore: avoid_print
+        print('Seller stats HTTP Error: ${response.statusCode}');
         return {'stats': <String, dynamic>{}};
       }
 
       final decoded = jsonDecode(response.body);
+      // ignore: avoid_print
+      print('Seller stats response: $decoded');
+
       if (decoded is Map<String, dynamic>) {
         return decoded;
       }
@@ -83,6 +114,27 @@ class ApiService {
       // ignore: avoid_print
       print('Seller stats API Error: $e');
       return {'stats': <String, dynamic>{}};
+    }
+  }
+
+  Future<List<Car>> getSellerCars(int sellerId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("$_apiHost/get_seller_cars.php?seller_id=$sellerId"),
+      );
+
+      if (response.statusCode == 200) {
+        List<dynamic> body = jsonDecode(response.body);
+        return body.map((dynamic item) => Car.fromJson(item)).toList();
+      } else {
+        // ignore: avoid_print
+        print('Seller cars HTTP Error: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("Seller cars API Error: $e");
+      return [];
     }
   }
 }

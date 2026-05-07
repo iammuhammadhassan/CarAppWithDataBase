@@ -5,9 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'login_screen.dart';
 import '../services/api_service.dart';
+import '../models/car_model.dart';
+import '../widgets/car_card_widget.dart';
 
 class SellerDashboard extends StatefulWidget {
-  const SellerDashboard({super.key});
+  final int sellerId;
+  const SellerDashboard({super.key, this.sellerId = 1});
 
   @override
   State<SellerDashboard> createState() => _SellerDashboardState();
@@ -22,7 +25,7 @@ class _SellerDashboardState extends State<SellerDashboard>
   @override
   void initState() {
     super.initState();
-    _sellerStatsFuture = ApiService().fetchSellerStats();
+    _sellerStatsFuture = ApiService().fetchSellerStats(widget.sellerId);
     _weeklyViewsFuture = ApiService().fetchWeeklyViews();
     _logoGlowController = AnimationController(
       vsync: this,
@@ -370,126 +373,45 @@ class _SellerDashboardState extends State<SellerDashboard>
     return FutureBuilder<Map<String, dynamic>>(
       future: _sellerStatsFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF00F5FF)),
+          );
         }
 
         final data = snapshot.data ?? <String, dynamic>{};
-        final listings = (data['listings'] as List?) ?? <dynamic>[];
+        final rawListings = data['listings'];
+        final listings = rawListings is List ? rawListings : <dynamic>[];
 
         if (listings.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: const Text(
-            'No active listings found for this seller.',
+          return Center(
+            child: Text(
+              'No active listings yet. Add your first vehicle!',
               style: TextStyle(color: Colors.white70),
             ),
           );
         }
 
-        return Column(
-          children: List.generate(listings.length, (index) {
-            final item =
-                listings[index] as Map<String, dynamic>? ?? <String, dynamic>{};
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.8,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          itemCount: listings.length,
+          itemBuilder: (context, index) {
+            final item = listings[index];
+            if (item is! Map<String, dynamic>) {
+              return const SizedBox.shrink();
+            }
 
-            final make = (item['make'] ?? '').toString().trim();
-            final model = (item['model'] ?? '').toString().trim();
-            final title = '$make $model'.trim().isEmpty
-                ? 'Untitled Car'
-                : '$make $model'.trim();
-            final price = 'PKR ${(item['price'] ?? '0').toString()}';
-            final imageUrl = (item['image_url'] ?? '').toString().trim();
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: index == listings.length - 1 ? 0 : 12,
-              ),
-              child: _buildListCard(imageUrl, title, price),
-            );
-          }),
+            return CarCardWidget(car: Car.fromJson(item));
+          },
         );
       },
-    );
-  }
-
-  Widget _buildListCard(String imageUrl, String title, String price) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: primaryNeon.withValues(alpha: 0.05),
-            blurRadius: 16,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            // Image Implementation
-            borderRadius: BorderRadius.circular(15),
-            child: imageUrl.isEmpty
-                ? Container(
-                    width: 60,
-                    height: 60,
-                    color: Colors.white12,
-                    child: Icon(
-                      Icons.directions_car,
-                      color: primaryNeon,
-                      size: 28,
-                    ),
-                  )
-                : Image.network(
-                    imageUrl,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 60,
-                        height: 60,
-                        color: Colors.white12,
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: primaryNeon,
-                          size: 28,
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          const SizedBox(width: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              Text(
-                price,
-                style: TextStyle(
-                  color: primaryNeon,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
