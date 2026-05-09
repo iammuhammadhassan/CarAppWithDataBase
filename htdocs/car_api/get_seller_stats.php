@@ -3,14 +3,49 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 include 'db_config.php';
 
-// Read seller_id from POST request
-$seller_id = isset($_POST['seller_id']) ? intval($_POST['seller_id']) : 0;
+// Read seller_id (or fallback user_id) from POST request
+$seller_id = isset($_POST['seller_id'])
+    ? intval($_POST['seller_id'])
+    : (isset($_POST['user_id']) ? intval($_POST['user_id']) : 0);
+
+function resolveOwnerColumn($conn, $table) {
+    $sellerCol = $conn->query("SHOW COLUMNS FROM $table LIKE 'seller_id'");
+    if ($sellerCol && $sellerCol->num_rows > 0) {
+        return 'seller_id';
+    }
+
+    $userCol = $conn->query("SHOW COLUMNS FROM $table LIKE 'user_id'");
+    if ($userCol && $userCol->num_rows > 0) {
+        return 'user_id';
+    }
+
+    return null;
+}
+
+$vehiclesOwnerCol = resolveOwnerColumn($conn, 'vehicles');
+$inquiriesOwnerCol = resolveOwnerColumn($conn, 'inquiries');
+
+if ($vehiclesOwnerCol === null || $inquiriesOwnerCol === null) {
+    echo json_encode([
+        "stats" => [
+            "active_listings" => 0,
+            "total_views" => 0,
+            "total_inquiries" => 0
+        ],
+        "listings" => [],
+        "_debug" => [
+            "seller_id" => $seller_id,
+            "error" => "Missing owner column (seller_id/user_id) in required tables"
+        ]
+    ]);
+    exit;
+}
 
 // Get stats
 $sql_stats = "SELECT 
-    (SELECT COUNT(*) FROM vehicles WHERE seller_id = $seller_id) as active_listings,
-    (SELECT SUM(views) FROM vehicles WHERE seller_id = $seller_id) as total_views,
-    (SELECT COUNT(*) FROM inquiries WHERE seller_id = $seller_id) as total_inquiries";
+    (SELECT COUNT(*) FROM vehicles WHERE $vehiclesOwnerCol = $seller_id) as active_listings,
+    (SELECT SUM(views) FROM vehicles WHERE $vehiclesOwnerCol = $seller_id) as total_views,
+    (SELECT COUNT(*) FROM inquiries WHERE $inquiriesOwnerCol = $seller_id) as total_inquiries";
 
 $result = $conn->query($sql_stats);
 $stats = $result ? $result->fetch_assoc() : [];
@@ -18,7 +53,7 @@ $stats = $result ? $result->fetch_assoc() : [];
 // Get vehicles for this seller
 $listings = [];
 $error = null;
-$sql_listings = "SELECT * FROM vehicles WHERE seller_id = $seller_id";
+$sql_listings = "SELECT * FROM vehicles WHERE $vehiclesOwnerCol = $seller_id";
 $listings_result = $conn->query($sql_listings);
 
 if ($listings_result === false) {
@@ -39,6 +74,8 @@ $response = [
     "listings" => $listings,
     "_debug" => [
         "seller_id" => $seller_id,
+        "vehicles_owner_col" => $vehiclesOwnerCol,
+        "inquiries_owner_col" => $inquiriesOwnerCol,
         "listings_count" => count($listings),
         "error" => $error,
         "sample_vehicle" => $sample,

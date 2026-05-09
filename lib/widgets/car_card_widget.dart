@@ -16,6 +16,16 @@ class CarCardWidget extends StatefulWidget {
 class _CarCardWidgetState extends State<CarCardWidget> {
   bool _isHovered = false;
 
+  String get _safeImageUrl {
+    final url = widget.car.image.trim();
+    if (url.isEmpty) return '';
+    final uri = Uri.tryParse(url);
+    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+      return '';
+    }
+    return url;
+  }
+
   void _setHover(bool value) {
     if (_isHovered != value) {
       setState(() => _isHovered = value);
@@ -55,23 +65,33 @@ class _CarCardWidgetState extends State<CarCardWidget> {
             borderRadius: BorderRadius.circular(30),
             child: Stack(
               children: [
-                Image.network(
-                  widget.car.image,
-                  fit: BoxFit.cover,
-                  height: double.infinity,
-                  width: double.infinity,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.black54,
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: Colors.cyanAccent,
-                        size: 36,
+                _safeImageUrl.isNotEmpty
+                    ? Image.network(
+                        _safeImageUrl,
+                        fit: BoxFit.cover,
+                        height: double.infinity,
+                        width: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.black54,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.directions_car,
+                              color: Colors.cyanAccent,
+                              size: 36,
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: Colors.black54,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.directions_car,
+                          color: Colors.cyanAccent,
+                          size: 36,
+                        ),
                       ),
-                    );
-                  },
-                ),
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(

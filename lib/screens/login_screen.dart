@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'showroom_screen.dart';
 import 'seller_dashboard.dart';
@@ -74,6 +75,10 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (user != null) {
         final role = user.role.trim().toLowerCase();
+        final prefs = await SharedPreferences.getInstance();
+        final data = {'seller_id': user.sellerId ?? 0};
+        prefs.setInt('seller_id', data['seller_id']!);
+
         // ignore: avoid_print
         print('DEBUG: User role: $role, userId: ${user.userId}');
 
@@ -83,12 +88,18 @@ class _LoginScreenState extends State<LoginScreen>
             MaterialPageRoute(builder: (context) => const ShowroomScreen()),
           );
         } else if (role == 'seller') {
+          final sellerId = user.sellerId ?? 0;
+          if (sellerId <= 0) {
+            _showSnackBar("Seller ID missing. Please contact admin.");
+            return;
+          }
+
           // ignore: avoid_print
-          print('DEBUG: Navigating seller with ID: ${user.userId}');
+          print('DEBUG: Navigating seller with ID: $sellerId');
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => SellerDashboard(sellerId: user.userId ?? 1),
+              builder: (context) => SellerDashboard(sellerId: sellerId),
             ),
           );
         } else {

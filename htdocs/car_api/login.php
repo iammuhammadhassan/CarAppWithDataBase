@@ -65,6 +65,7 @@ error_log("LOGIN SUCCESS: user_id={$user['user_id']}, role={$user['role']}");
 echo json_encode([
     'success' => true,
     'user_id' => intval($user['user_id']),
+    'seller_id' => intval($user['user_id']),
     'full_name' => $user['full_name'],
     'role' => $user['role'],
     '_debug' => [

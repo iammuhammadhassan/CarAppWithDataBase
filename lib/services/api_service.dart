@@ -85,42 +85,35 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> fetchSellerStats(int sellerId) async {
-    try {
-      // ignore: avoid_print
-      print('DEBUG: Sending Seller ID to Server: $sellerId');
+  Future<Map<String, dynamic>> fetchSellerStats(int id) async {
+    // 1. Double check the IP matches your current 192.168.1.8
+    const String url = "http://192.168.1.8/car_api/get_seller_stats.php";
 
+    try {
       final response = await http.post(
-        Uri.parse(sellerStatsUrl),
-        body: {'seller_id': sellerId.toString()},
+        Uri.parse(url),
+        // 2. CRITICAL: body must be a Map<String, String>
+        body: {"seller_id": id.toString()},
       );
 
-      if (response.statusCode != 200) {
-        // ignore: avoid_print
-        print('Seller stats HTTP Error: ${response.statusCode}');
-        return {'stats': <String, dynamic>{}};
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server Error: ${response.statusCode}');
       }
-
-      final decoded = jsonDecode(response.body);
-      // ignore: avoid_print
-      print('Seller stats response: $decoded');
-
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
-      }
-
-      return {'stats': <String, dynamic>{}};
     } catch (e) {
       // ignore: avoid_print
-      print('Seller stats API Error: $e');
-      return {'stats': <String, dynamic>{}};
+      print("API Error: $e");
+      return {"success": false, "listings": []};
     }
   }
 
   Future<List<Car>> getSellerCars(int sellerId) async {
     try {
       final response = await http.get(
-        Uri.parse("$_apiHost/get_seller_cars.php?seller_id=$sellerId"),
+        Uri.parse(
+          "$_apiHost/get_seller_cars.php?seller_id=$sellerId&user_id=$sellerId",
+        ),
       );
 
       if (response.statusCode == 200) {

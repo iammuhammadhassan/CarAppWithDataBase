@@ -10,7 +10,7 @@ import '../widgets/car_card_widget.dart';
 
 class SellerDashboard extends StatefulWidget {
   final int sellerId;
-  const SellerDashboard({super.key, this.sellerId = 1});
+  const SellerDashboard({super.key, required this.sellerId});
 
   @override
   State<SellerDashboard> createState() => _SellerDashboardState();
@@ -231,6 +231,17 @@ class _SellerDashboardState extends State<SellerDashboard>
     return FutureBuilder<Map<String, dynamic>>(
       future: _sellerStatsFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          // ignore: avoid_print
+          print('Seller stats FutureBuilder error: ${snapshot.error}');
+          return const Center(
+            child: Text(
+              'Failed to load stats',
+              style: TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -330,6 +341,11 @@ class _SellerDashboardState extends State<SellerDashboard>
           child: FutureBuilder<List<double>>(
             future: _weeklyViewsFuture,
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                // ignore: avoid_print
+                print('Weekly views FutureBuilder error: ${snapshot.error}');
+              }
+
               final values =
                   (snapshot.data != null && snapshot.data!.isNotEmpty)
                   ? snapshot.data!
@@ -373,6 +389,17 @@ class _SellerDashboardState extends State<SellerDashboard>
     return FutureBuilder<Map<String, dynamic>>(
       future: _sellerStatsFuture,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          // ignore: avoid_print
+          print('Active listings FutureBuilder error: ${snapshot.error}');
+          return const Center(
+            child: Text(
+              'Failed to load listings',
+              style: TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(color: Color(0xFF00F5FF)),
@@ -405,10 +432,18 @@ class _SellerDashboardState extends State<SellerDashboard>
           itemBuilder: (context, index) {
             final item = listings[index];
             if (item is! Map<String, dynamic>) {
+              // ignore: avoid_print
+              print('Invalid listing item type: ${item.runtimeType}');
               return const SizedBox.shrink();
             }
 
-            return CarCardWidget(car: Car.fromJson(item));
+            try {
+              return CarCardWidget(car: Car.fromJson(item));
+            } catch (e) {
+              // ignore: avoid_print
+              print('Car parsing error at index $index: $e, item: $item');
+              return const SizedBox.shrink();
+            }
           },
         );
       },
