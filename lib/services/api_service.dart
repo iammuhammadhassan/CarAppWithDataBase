@@ -108,42 +108,30 @@ class ApiService {
     }
   }
 
-  Future<bool> sendInquiry(int vehicleId, int sellerId, int buyerId) async {
-    const String url = "http://192.168.1.8/car_api/send_inquiry.php";
-
+  Future<bool> sendInquiry({
+    required int vehicleId,
+    required int sellerId,
+    required int buyerId,
+  }) async {
     try {
       final response = await http.post(
-        Uri.parse(url),
+        Uri.parse("http://192.168.1.8/car_api/send_inquiry.php"),
         body: {
-          'vehicle_id': vehicleId.toString(),
-          'seller_id': sellerId.toString(),
-          'buyer_id': buyerId.toString(),
+          "vehicle_id": vehicleId.toString(),
+          "seller_id": sellerId.toString(),
+          "buyer_id": buyerId.toString(),
+          "message": "I am interested in this ${DateTime.now()}",
         },
       );
 
-      if (response.statusCode != 200) {
-        // ignore: avoid_print
-        print('Inquiry HTTP Error: ${response.statusCode}');
-        return false;
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
       }
-
-      final decoded = json.decode(response.body);
-      if (decoded is Map<String, dynamic>) {
-        final success = decoded['success'];
-        if (success is bool) return success;
-        if (success is num) return success == 1;
-        if (success is String) {
-          final normalized = success.trim().toLowerCase();
-          return normalized == 'true' ||
-              normalized == '1' ||
-              normalized == 'success';
-        }
-      }
-
       return false;
     } catch (e) {
       // ignore: avoid_print
-      print('Inquiry API Error: $e');
+      print("Inquiry Error: $e");
       return false;
     }
   }

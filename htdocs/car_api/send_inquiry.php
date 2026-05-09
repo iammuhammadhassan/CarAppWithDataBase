@@ -7,6 +7,7 @@ include 'db_config.php';
 $vehicle_id = isset($_POST['vehicle_id']) ? intval($_POST['vehicle_id']) : 0;
 $seller_id = isset($_POST['seller_id']) ? intval($_POST['seller_id']) : 0;
 $buyer_id = isset($_POST['buyer_id']) ? intval($_POST['buyer_id']) : 0;
+$message = isset($_POST['message']) ? trim($_POST['message']) : '';
 
 if ($vehicle_id <= 0 || $seller_id <= 0 || $buyer_id <= 0) {
     echo json_encode([
@@ -36,6 +37,7 @@ if ($columnResult) {
 $hasVehicleId = in_array('vehicle_id', $columns, true);
 $hasSellerId = in_array('seller_id', $columns, true);
 $hasBuyerId = in_array('buyer_id', $columns, true);
+$hasMessage = in_array('message', $columns, true);
 $hasCreatedAt = in_array('created_at', $columns, true);
 
 if (!$hasVehicleId || !$hasSellerId || !$hasBuyerId) {
@@ -47,8 +49,12 @@ if (!$hasVehicleId || !$hasSellerId || !$hasBuyerId) {
 }
 
 $sql = $hasCreatedAt
-    ? "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, created_at) VALUES (?, ?, ?, NOW())"
-    : "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id) VALUES (?, ?, ?)";
+    ? ($hasMessage
+        ? "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, message, created_at) VALUES (?, ?, ?, ?, NOW())"
+        : "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, created_at) VALUES (?, ?, ?, NOW())")
+    : ($hasMessage
+        ? "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, message) VALUES (?, ?, ?, ?)"
+        : "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id) VALUES (?, ?, ?)");
 
 $stmt = $conn->prepare($sql);
 
@@ -60,7 +66,11 @@ if (!$stmt) {
     exit;
 }
 
-$stmt->bind_param('iii', $vehicle_id, $seller_id, $buyer_id);
+if ($hasMessage) {
+    $stmt->bind_param('iiis', $vehicle_id, $seller_id, $buyer_id, $message);
+} else {
+    $stmt->bind_param('iii', $vehicle_id, $seller_id, $buyer_id);
+}
 
 if ($stmt->execute()) {
     echo json_encode([

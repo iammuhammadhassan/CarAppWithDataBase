@@ -16,7 +16,6 @@ class CarDetailsScreen extends StatefulWidget {
 
 class _CarDetailsScreenState extends State<CarDetailsScreen> {
   final PageController _pageController = PageController();
-  bool _isSendingInquiry = false;
 
   @override
   void dispose() {
@@ -46,44 +45,52 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
     return widget.car.price.toStringAsFixed(0);
   }
 
-  Future<void> _sendInquiry() async {
-    if (_isSendingInquiry) return;
+  Future<void> _handleInquiry(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
 
-    setState(() => _isSendingInquiry = true);
+    final prefs = await SharedPreferences.getInstance();
+    final buyerId = prefs.getInt('user_id') ?? prefs.getInt('seller_id') ?? 0;
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final buyerId = prefs.getInt('user_id') ?? 0;
-
-      if (buyerId <= 0) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Buyer ID not found. Please log in again.'),
-          ),
-        );
-        return;
+    if (buyerId <= 0) {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
       }
-
-      final success = await ApiService().sendInquiry(
-        widget.car.vehicleId,
-        widget.car.sellerId,
-        buyerId,
-      );
-
-      if (!mounted) return;
-
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success ? 'Inquiry sent successfully.' : 'Failed to send inquiry.',
-          ),
+        const SnackBar(
+          content: Text('Buyer ID not found. Please log in again.'),
+          backgroundColor: Colors.red,
         ),
       );
-    } finally {
-      if (mounted) {
-        setState(() => _isSendingInquiry = false);
-      }
+      return;
+    }
+
+    bool success = await ApiService().sendInquiry(
+      vehicleId: widget.car.vehicleId,
+      sellerId: widget.car.sellerId,
+      buyerId: buyerId,
+    );
+
+    Navigator.pop(context); // Remove loading indicator
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Inquiry Sent Successfully!"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("❌ Failed to send inquiry. Try again."),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -178,7 +185,7 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _isSendingInquiry ? null : _sendInquiry,
+                      onPressed: () => _handleInquiry(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.cyanAccent,
                         foregroundColor: Colors.black,
@@ -186,21 +193,13 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: _isSendingInquiry
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : const Text(
-                              'Inquire Now',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                      child: const Text(
+                        'Inquire Now',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
                 ],
