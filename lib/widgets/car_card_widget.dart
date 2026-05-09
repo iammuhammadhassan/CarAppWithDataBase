@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/car_model.dart';
+import '../screens/car_details_screen.dart';
 
 const Color carCardPrimaryNeon = Color(0xFF00F5FF);
 
@@ -38,6 +39,14 @@ class _CarCardWidgetState extends State<CarCardWidget> {
       onEnter: (_) => _setHover(true),
       onExit: (_) => _setHover(false),
       child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CarDetailsScreen(car: widget.car),
+            ),
+          );
+        },
         onTapDown: (_) => _setHover(true),
         onTapCancel: () => _setHover(false),
         onTapUp: (_) => _setHover(false),
@@ -66,22 +75,25 @@ class _CarCardWidgetState extends State<CarCardWidget> {
             child: Stack(
               children: [
                 _safeImageUrl.isNotEmpty
-                    ? Image.network(
-                        _safeImageUrl,
-                        fit: BoxFit.cover,
-                        height: double.infinity,
-                        width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.black54,
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.directions_car,
-                              color: Colors.cyanAccent,
-                              size: 36,
-                            ),
-                          );
-                        },
+                    ? Hero(
+                        tag: 'car-image-${widget.car.vehicleId}-0',
+                        child: Image.network(
+                          _safeImageUrl,
+                          fit: BoxFit.cover,
+                          height: double.infinity,
+                          width: double.infinity,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.black54,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.directions_car,
+                                color: Colors.cyanAccent,
+                                size: 36,
+                              ),
+                            );
+                          },
+                        ),
                       )
                     : Container(
                         color: Colors.black54,

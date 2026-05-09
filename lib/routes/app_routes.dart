@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/car_details_screen.dart';
 import '../models/car_model.dart';
+import '../screens/car_details_screen.dart';
 import '../screens/showroom_screen.dart';
 
 class AppRoutes {

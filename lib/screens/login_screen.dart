@@ -76,8 +76,11 @@ class _LoginScreenState extends State<LoginScreen>
       if (user != null) {
         final role = user.role.trim().toLowerCase();
         final prefs = await SharedPreferences.getInstance();
+        if (user.userId != null) {
+          await prefs.setInt('user_id', user.userId!);
+        }
         final data = {'seller_id': user.sellerId ?? 0};
-        prefs.setInt('seller_id', data['seller_id']!);
+        await prefs.setInt('seller_id', data['seller_id']!);
 
         // ignore: avoid_print
         print('DEBUG: User role: $role, userId: ${user.userId}');

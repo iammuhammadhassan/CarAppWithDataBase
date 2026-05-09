@@ -10,6 +10,8 @@ class Car {
   final String transmission;
   final String location;
   final String imageUrl;
+  final String? imageUrl2;
+  final String? imageUrl3;
   final int isInspected;
   final int views;
 
@@ -25,11 +27,27 @@ class Car {
     required this.transmission,
     required this.location,
     required this.imageUrl,
+    this.imageUrl2,
+    this.imageUrl3,
     required this.isInspected,
     required this.views,
   });
 
   factory Car.fromJson(Map<String, dynamic> json) {
+    String? readText(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key];
+        if (value != null) {
+          final text = value.toString().trim();
+          if (text.isNotEmpty && text.toLowerCase() != 'null') {
+            return text;
+          }
+        }
+      }
+
+      return null;
+    }
+
     return Car(
       vehicleId: int.tryParse(json['vehicle_id'].toString()) ?? 0,
       sellerId: int.tryParse(json['seller_id'].toString()) ?? 0,
@@ -43,6 +61,8 @@ class Car {
       transmission: json['transmission']?.toString() ?? '',
       location: json['location']?.toString() ?? '',
       imageUrl: json['image_url']?.toString() ?? '',
+      imageUrl2: readText(['image_url_2', 'image_url2', 'image2']),
+      imageUrl3: readText(['image_url_3', 'image_url3', 'image3']),
       isInspected: int.tryParse(json['is_inspected'].toString()) ?? 0,
       views: int.tryParse(json['views']?.toString() ?? '0') ?? 0,
     );
