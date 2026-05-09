@@ -112,6 +112,7 @@ class ApiService {
     required int vehicleId,
     required int sellerId,
     required int buyerId,
+    String? message,
   }) async {
     try {
       final response = await http.post(
@@ -120,7 +121,9 @@ class ApiService {
           "vehicle_id": vehicleId.toString(),
           "seller_id": sellerId.toString(),
           "buyer_id": buyerId.toString(),
-          "message": "I am interested in this ${DateTime.now()}",
+          "message": message?.trim().isNotEmpty == true
+              ? message!.trim()
+              : "I am interested in this ${DateTime.now()}",
         },
       );
 

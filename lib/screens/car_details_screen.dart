@@ -45,7 +45,7 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
     return widget.car.price.toStringAsFixed(0);
   }
 
-  Future<void> _handleInquiry(BuildContext context) async {
+  Future<void> _handleInquiry(BuildContext context, String message) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -69,28 +69,91 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
       return;
     }
 
-    bool success = await ApiService().sendInquiry(
+    final success = await ApiService().sendInquiry(
       vehicleId: widget.car.vehicleId,
       sellerId: widget.car.sellerId,
       buyerId: buyerId,
+      message: message,
     );
 
-    Navigator.pop(context); // Remove loading indicator
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+
+    if (!context.mounted) return;
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("✅ Inquiry Sent Successfully!"),
+          content: Text('✅ Inquiry Sent Successfully!'),
           backgroundColor: Colors.green,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("❌ Failed to send inquiry. Try again."),
+          content: Text('❌ Failed to send inquiry. Try again.'),
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _showInquiryDialog(BuildContext context) async {
+    final messageController = TextEditingController(
+      text: 'I am interested in this ${widget.car.make} ${widget.car.model}.',
+    );
+
+    try {
+      final message = await showDialog<String>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF111417),
+            title: const Text(
+              'Send Inquiry',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: TextField(
+              controller: messageController,
+              maxLines: 4,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Write your custom inquiry message',
+                hintStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.06),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, messageController.text);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Send'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted || message == null) return;
+
+      await _handleInquiry(context, message);
+    } finally {
+      messageController.dispose();
     }
   }
 
@@ -185,7 +248,7 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: () => _handleInquiry(context),
+                      onPressed: () => _showInquiryDialog(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.cyanAccent,
                         foregroundColor: Colors.black,
