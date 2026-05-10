@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/car_model.dart';
 import '../services/api_service.dart';
 import '../widgets/car_card_widget.dart';
 import 'login_screen.dart';
+import 'buyer_inquiries_screen.dart';
 
 final Color primaryNeon = const Color(0xFF00F5FF);
 final Color midnightBg = const Color(0xFF0B0D0F);
@@ -28,6 +30,7 @@ class _ShowroomScreenState extends State<ShowroomScreen>
   final ValueNotifier<bool> _isFeaturedHovered = ValueNotifier<bool>(false);
   late final AnimationController _logoGlowController;
   late final AnimationController _featuredCardGlowController;
+  int _selectedTabIndex = 0;
 
   @override
   void initState() {
@@ -54,78 +57,126 @@ class _ShowroomScreenState extends State<ShowroomScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned(
-            top: -100,
-            left: -100,
-            child: _buildGlow(primaryNeon.withValues(alpha: 0.08)),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedTabIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedTabIndex = index;
+          });
+        },
+        backgroundColor: Colors.black,
+        selectedItemColor: const Color(0xFF00F5FF),
+        unselectedItemColor: Colors.white54,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.directions_car),
+            label: 'Showroom',
           ),
-          Positioned(
-            bottom: 50,
-            right: -100,
-            child: _buildGlow(Colors.purple.withValues(alpha: 0.05)),
-          ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(context),
-                _buildSearchBar(),
-                _buildSectionHeader(
-                  'Featured Listings',
-                  'Hand-picked premium vehicles',
-                ),
-                Expanded(
-                  child: FutureBuilder<List<Car>>(
-                    future: ApiService().getCars(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.cyanAccent,
-                          ),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return const Center(
-                          child: Text(
-                            'Failed to load cars.',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        );
-                      }
-
-                      final cars = snapshot.data;
-                      if (cars == null || cars.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            'No cars found. Check XAMPP & Database.',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        );
-                      }
-
-                      return ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        children: [
-                          _buildHeroFeaturedCard(cars.first),
-                          const SizedBox(height: 25),
-                          _buildBentoGrid(
-                            cars.length > 1 ? cars.sublist(1) : const [],
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble),
+            label: 'My Chats',
           ),
         ],
       ),
+      body: _selectedTabIndex == 0 ? _buildShowroomTab() : _buildChatsTab(),
     );
+  }
+
+  Widget _buildShowroomTab() {
+    return Stack(
+      children: [
+        Positioned(
+          top: -100,
+          left: -100,
+          child: _buildGlow(primaryNeon.withValues(alpha: 0.08)),
+        ),
+        Positioned(
+          bottom: 50,
+          right: -100,
+          child: _buildGlow(Colors.purple.withValues(alpha: 0.05)),
+        ),
+
+        SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              _buildSearchBar(),
+              _buildSectionHeader(
+                'Featured Listings',
+                'Hand-picked premium vehicles',
+              ),
+              Expanded(
+                child: FutureBuilder<List<Car>>(
+                  future: ApiService().getCars(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.cyanAccent,
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text(
+                          'Failed to load cars.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    }
+
+                    final cars = snapshot.data;
+                    if (cars == null || cars.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No cars found. Check XAMPP & Database.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      );
+                    }
+
+                    return ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      children: [
+                        _buildHeroFeaturedCard(cars.first),
+                        const SizedBox(height: 25),
+                        _buildBentoGrid(
+                          cars.length > 1 ? cars.sublist(1) : const [],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChatsTab() {
+    return FutureBuilder<int>(
+      future: _getBuyerId(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null || snapshot.data! <= 0) {
+          return Center(
+            child: Text(
+              'Unable to load your inquiries. Please log in again.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+
+        return BuyerInquiriesScreen(buyerId: snapshot.data!);
+      },
+    );
+  }
+
+  Future<int> _getBuyerId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('user_id') ?? prefs.getInt('seller_id') ?? 0;
   }
 
   Widget _buildHeader(BuildContext context) {

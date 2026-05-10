@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/car_model.dart';
 import '../services/api_service.dart';
+import 'chat_screen.dart';
 
 class CarDetailsScreen extends StatefulWidget {
   final Car car;
@@ -89,6 +90,9 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
           backgroundColor: Colors.green,
         ),
       );
+
+      // Fetch the latest inquiry for this vehicle and navigate to ChatScreen
+      await _navigateToChatForLatestInquiry(context, buyerId);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -96,6 +100,65 @@ class _CarDetailsScreenState extends State<CarDetailsScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _navigateToChatForLatestInquiry(
+    BuildContext context,
+    int buyerId,
+  ) async {
+    try {
+      // Fetch all inquiries for this buyer
+      final inquiries = await ApiService().fetchBuyerInquiries(buyerId);
+
+      if (!context.mounted) return;
+
+      // Find the most recent inquiry for this vehicle
+      final relevantInquiries = inquiries.where((inq) {
+        return inq.vehicleId == widget.car.vehicleId && inq.buyerId == buyerId;
+      }).toList();
+
+      if (relevantInquiries.isEmpty) {
+        // If we can't find it immediately, wait a bit and try again
+        await Future.delayed(const Duration(milliseconds: 500));
+        final retryInquiries = await ApiService().fetchBuyerInquiries(buyerId);
+
+        if (!context.mounted) return;
+
+        final foundInquiries = retryInquiries.where((inq) {
+          return inq.vehicleId == widget.car.vehicleId &&
+              inq.buyerId == buyerId;
+        }).toList();
+
+        if (foundInquiries.isNotEmpty) {
+          foundInquiries.sort((a, b) => b.date.compareTo(a.date));
+          final latestInquiry = foundInquiries.first;
+
+          if (!context.mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(inquiryId: latestInquiry.id),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Sort by date (most recent first) and navigate to the latest
+      relevantInquiries.sort((a, b) => b.date.compareTo(a.date));
+      final latestInquiry = relevantInquiries.first;
+
+      if (!context.mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(inquiryId: latestInquiry.id),
+        ),
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error navigating to chat: $e');
     }
   }
 

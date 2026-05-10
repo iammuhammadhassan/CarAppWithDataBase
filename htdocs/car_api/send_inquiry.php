@@ -35,8 +35,8 @@ if ($columnResult) {
 }
 
 $hasVehicleId = in_array('vehicle_id', $columns, true);
-$hasSellerId = in_array('seller_id', $columns, true);
-$hasBuyerId = in_array('buyer_id', $columns, true);
+$hasSellerId = in_array('seller_id', $columns, true) || in_array('user_id', $columns, true);
+$hasBuyerId = in_array('buyer_id', $columns, true) || in_array('user_id', $columns, true);
 $hasMessage = in_array('message', $columns, true);
 $hasCreatedAt = in_array('created_at', $columns, true);
 
@@ -48,13 +48,32 @@ if (!$hasVehicleId || !$hasSellerId || !$hasBuyerId) {
     exit;
 }
 
+$sellerColumn = in_array('seller_id', $columns, true) ? 'seller_id' : null;
+$buyerColumn = in_array('buyer_id', $columns, true) ? 'buyer_id' : null;
+
+if ($sellerColumn === null && in_array('user_id', $columns, true)) {
+    $sellerColumn = 'user_id';
+}
+
+if ($buyerColumn === null && in_array('user_id', $columns, true)) {
+    $buyerColumn = $sellerColumn === 'user_id' ? null : 'user_id';
+}
+
+if ($sellerColumn === null || $buyerColumn === null) {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Inquiries table cannot map seller/buyer columns'
+    ]);
+    exit;
+}
+
 $sql = $hasCreatedAt
     ? ($hasMessage
-        ? "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, message, created_at) VALUES (?, ?, ?, ?, NOW())"
-        : "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, created_at) VALUES (?, ?, ?, NOW())")
+        ? "INSERT INTO inquiries (vehicle_id, $sellerColumn, $buyerColumn, message, created_at) VALUES (?, ?, ?, ?, NOW())"
+        : "INSERT INTO inquiries (vehicle_id, $sellerColumn, $buyerColumn, created_at) VALUES (?, ?, ?, NOW())")
     : ($hasMessage
-        ? "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id, message) VALUES (?, ?, ?, ?)"
-        : "INSERT INTO inquiries (vehicle_id, seller_id, buyer_id) VALUES (?, ?, ?)");
+        ? "INSERT INTO inquiries (vehicle_id, $sellerColumn, $buyerColumn, message) VALUES (?, ?, ?, ?)"
+        : "INSERT INTO inquiries (vehicle_id, $sellerColumn, $buyerColumn) VALUES (?, ?, ?)");
 
 $stmt = $conn->prepare($sql);
 

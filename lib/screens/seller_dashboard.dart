@@ -6,7 +6,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'login_screen.dart';
 import '../services/api_service.dart';
 import '../models/car_model.dart';
+import '../models/inquiry_model.dart';
 import '../widgets/car_card_widget.dart';
+import 'inquiries_screen.dart';
+import 'chat_screen.dart';
 
 class SellerDashboard extends StatefulWidget {
   final int sellerId;
@@ -62,45 +65,89 @@ class _SellerDashboardState extends State<SellerDashboard>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: obsidianBg,
-      body: Stack(
-        children: [
-          Positioned(
-            top: -90,
-            left: -100,
-            child: _buildGlow(primaryNeon.withValues(alpha: 0.08)),
-          ),
-          Positioned(
-            bottom: 50,
-            right: -110,
-            child: _buildGlow(Colors.purple.withValues(alpha: 0.05)),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: obsidianBg,
+        body: Stack(
+          children: [
+            Positioned(
+              top: -90,
+              left: -100,
+              child: _buildGlow(primaryNeon.withValues(alpha: 0.08)),
+            ),
+            Positioned(
+              bottom: 50,
+              right: -110,
+              child: _buildGlow(Colors.purple.withValues(alpha: 0.05)),
+            ),
+            SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(context),
-                  const SizedBox(height: 20),
-                  _buildStatsGrid(),
-                  const SizedBox(height: 30),
-                  _buildChartSection(),
-                  const SizedBox(height: 30),
-                  _buildSectionHeader(
-                    'Active Listings',
-                    'Manage your live inventory',
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 10,
+                    ),
+                    child: _buildHeader(context),
                   ),
-                  const SizedBox(height: 15),
-                  _buildActiveListingsList(),
-                  const SizedBox(height: 25),
-                  _buildQuickListButton(),
+                  const TabBar(
+                    indicatorColor: Color(0xFF00F5FF),
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white54,
+                    tabs: [
+                      Tab(text: 'Overview'),
+                      Tab(text: 'Inquiries'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 10,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 10),
+                              _buildStatsGrid(),
+                              const SizedBox(height: 30),
+                              _buildChartSection(),
+                              const SizedBox(height: 30),
+                              _buildRecentInquiries(),
+                              const SizedBox(height: 30),
+                              _buildSectionHeader(
+                                'Active Listings',
+                                'Manage your live inventory',
+                              ),
+                              const SizedBox(height: 15),
+                              _buildActiveListingsList(),
+                              const SizedBox(height: 25),
+                              _buildQuickListButton(),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 10,
+                          ),
+                          child: InquiriesScreen(
+                            isSellerView: true,
+                            userId: widget.sellerId,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -379,6 +426,154 @@ class _SellerDashboardState extends State<SellerDashboard>
               );
             },
           ),
+        ),
+      ],
+    );
+  }
+
+  // 3.5. Recent Inquiries Section
+  Widget _buildRecentInquiries() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Recent Inquiries', 'Latest buyer inquiries'),
+        const SizedBox(height: 15),
+        FutureBuilder<List<Inquiry>>(
+          future: ApiService().fetchInquiries(widget.sellerId),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              // ignore: avoid_print
+              print('Recent inquiries FutureBuilder error: ${snapshot.error}');
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: const Text(
+                  'Failed to load inquiries',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: const CircularProgressIndicator(
+                  color: Color(0xFF00F5FF),
+                ),
+              );
+            }
+
+            final inquiries = snapshot.data ?? [];
+
+            if (inquiries.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: Text(
+                  'No inquiries yet',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: inquiries.length > 3 ? 3 : inquiries.length,
+              itemBuilder: (context, index) {
+                final inquiry = inquiries[index];
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(inquiryId: inquiry.id),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    inquiry.carName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    inquiry.message,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.chevron_right,
+                              color: primaryNeon,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          inquiry.date,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
         ),
       ],
     );
